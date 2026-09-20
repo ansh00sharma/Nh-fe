@@ -7,6 +7,7 @@ import {
   getProjects,
   updateProject,
 } from "../api/projects.js";
+import DeleteConfirmationModal from "../components/DeleteConfirmationModal.jsx";
 
 const emptyForm = {
   name: "",
@@ -41,6 +42,8 @@ function Projects() {
   const [successMessage, setSuccessMessage] = useState("");
   const [modalMode, setModalMode] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formValues, setFormValues] = useState(emptyForm);
 
   const isModalOpen = Boolean(modalMode);
@@ -150,23 +153,31 @@ function Projects() {
   }
 
   async function handleDelete(project) {
-    const confirmed = window.confirm(`Delete "${project.name}"?`);
+    setProjectToDelete(project);
+    setError("");
+    setSuccessMessage("");
+  }
 
-    if (!confirmed) {
+  async function confirmDeleteProject() {
+    if (!projectToDelete) {
       return;
     }
 
+    setIsDeleting(true);
     setError("");
     setSuccessMessage("");
 
     try {
-      await deleteProject(project.id);
-      setProjects((current) => current.filter((item) => item.id !== project.id));
+      await deleteProject(projectToDelete.id);
+      setProjects((current) => current.filter((item) => item.id !== projectToDelete.id));
       setSuccessMessage("Project deleted successfully.");
+      setProjectToDelete(null);
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
         setError(apiError.message || "Could not delete project.");
       }
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -317,6 +328,20 @@ function Projects() {
             </form>
           </section>
         </div>
+      )}
+
+      {projectToDelete && (
+        <DeleteConfirmationModal
+          title="Delete Project"
+          description={`Are you sure you want to delete "${projectToDelete.name}"? This action cannot be undone.`}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            if (!isDeleting) {
+              setProjectToDelete(null);
+            }
+          }}
+          onDelete={confirmDeleteProject}
+        />
       )}
     </div>
   );

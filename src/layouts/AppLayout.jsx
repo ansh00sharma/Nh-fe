@@ -18,7 +18,7 @@ function AppLayout() {
   useEffect(() => {
     const accessToken = getAccessToken();
 
-    if (!accessToken || user) {
+    if (!accessToken || user?.modules?.length) {
       return;
     }
 
@@ -51,7 +51,7 @@ function AppLayout() {
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed((current) => !current)}
-          role={user?.role}
+          modules={user?.modules}
         />
         <main className="min-w-0 flex-1 overflow-auto p-8">
           <Outlet />

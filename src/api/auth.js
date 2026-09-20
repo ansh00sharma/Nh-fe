@@ -95,8 +95,24 @@ export function getStoredUserRole() {
   return getStoredUser()?.role ?? null;
 }
 
+export function getStoredUserModules() {
+  return getStoredUser()?.modules ?? [];
+}
+
+export function hasModuleAccess(moduleName, user = getStoredUser()) {
+  return user?.modules?.includes(moduleName) ?? false;
+}
+
 export function getDefaultAuthenticatedPath(user = getStoredUser()) {
-  return user?.role === "agent" ? "/tasks" : "/projects";
+  if (hasModuleAccess("projects", user)) {
+    return "/projects";
+  }
+
+  if (hasModuleAccess("tasks", user)) {
+    return "/tasks";
+  }
+
+  return "/login";
 }
 
 export function getUserInitials(user) {

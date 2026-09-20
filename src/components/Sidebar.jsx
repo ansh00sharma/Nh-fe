@@ -4,6 +4,7 @@ const navItems = [
   {
     label: "Users",
     path: "/users",
+    module: "users",
     icon: (
       <svg
         aria-hidden="true"
@@ -29,6 +30,7 @@ const navItems = [
   {
     label: "Projects",
     path: "/projects",
+    module: "projects",
     icon: (
       <svg
         aria-hidden="true"
@@ -49,6 +51,7 @@ const navItems = [
   {
     label: "Tasks",
     path: "/tasks",
+    module: "tasks",
     icon: (
       <svg
         aria-hidden="true"
@@ -68,9 +71,8 @@ const navItems = [
   },
 ];
 
-function Sidebar({ collapsed, onToggle, role }) {
-  const visibleNavItems =
-    role === "manager" ? navItems : navItems.filter((item) => item.path === "/tasks");
+function Sidebar({ collapsed, onToggle, modules = [] }) {
+  const visibleNavItems = navItems.filter((item) => modules.includes(item.module));
 
   return (
     <aside

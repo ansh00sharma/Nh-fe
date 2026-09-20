@@ -15,8 +15,10 @@ function Login() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (getAccessToken()) {
-    return <Navigate to={getDefaultAuthenticatedPath()} replace />;
+  const defaultAuthenticatedPath = getDefaultAuthenticatedPath();
+
+  if (getAccessToken() && defaultAuthenticatedPath !== "/login") {
+    return <Navigate to={defaultAuthenticatedPath} replace />;
   }
 
   async function handleSubmit(event) {
