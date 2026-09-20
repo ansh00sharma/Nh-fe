@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { fetchCurrentUser, getAccessToken, login, saveAuthSession } from "../api/auth.js";
+import {
+  fetchCurrentUser,
+  getAccessToken,
+  getDefaultAuthenticatedPath,
+  login,
+  saveAuthSession,
+} from "../api/auth.js";
 
 function Login() {
   const navigate = useNavigate();
@@ -10,7 +16,7 @@ function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (getAccessToken()) {
-    return <Navigate to="/projects" replace />;
+    return <Navigate to={getDefaultAuthenticatedPath()} replace />;
   }
 
   async function handleSubmit(event) {
@@ -34,7 +40,7 @@ function Login() {
       const user = await fetchCurrentUser(accessToken);
 
       saveAuthSession({ accessToken, refreshToken, user });
-      navigate("/projects", { replace: true });
+      navigate(getDefaultAuthenticatedPath(user), { replace: true });
     } catch (loginError) {
       setError(loginError.message || "Login failed. Please try again.");
     } finally {

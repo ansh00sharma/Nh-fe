@@ -91,6 +91,14 @@ export function getStoredUser() {
   }
 }
 
+export function getStoredUserRole() {
+  return getStoredUser()?.role ?? null;
+}
+
+export function getDefaultAuthenticatedPath(user = getStoredUser()) {
+  return user?.role === "agent" ? "/tasks" : "/projects";
+}
+
 export function getUserInitials(user) {
   if (!user) {
     return "";

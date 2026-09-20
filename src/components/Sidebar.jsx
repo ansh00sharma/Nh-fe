@@ -68,7 +68,10 @@ const navItems = [
   },
 ];
 
-function Sidebar({ collapsed, onToggle }) {
+function Sidebar({ collapsed, onToggle, role }) {
+  const visibleNavItems =
+    role === "manager" ? navItems : navItems.filter((item) => item.path === "/tasks");
+
   return (
     <aside
       className={`flex min-h-0 flex-col border-r border-slate-200 bg-white transition-all duration-200 ${
@@ -97,7 +100,7 @@ function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="space-y-1 p-3" aria-label="Main navigation">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

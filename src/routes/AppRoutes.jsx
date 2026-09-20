@@ -4,6 +4,7 @@ import Login from "../pages/Login.jsx";
 import Projects from "../pages/Projects.jsx";
 import Tasks from "../pages/Tasks.jsx";
 import Users from "../pages/Users.jsx";
+import ManagerRoute from "./ManagerRoute.jsx";
 import ProtectedRoute from "./ProtectedRoute.jsx";
 
 function AppRoutes() {
@@ -14,7 +15,9 @@ function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/users" element={<Users />} />
-          <Route path="/projects" element={<Projects />} />
+          <Route element={<ManagerRoute />}>
+            <Route path="/projects" element={<Projects />} />
+          </Route>
           <Route path="/tasks" element={<Tasks />} />
         </Route>
       </Route>
