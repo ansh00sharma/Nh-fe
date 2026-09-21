@@ -5,6 +5,11 @@ import { getProjects } from "../api/projects.js";
 import { createTask, deleteTask, getTasks, updateTask } from "../api/tasks.js";
 import { getUsers } from "../api/users.js";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal.jsx";
+import {
+  formatDateTimeIST,
+  istDateTimeLocalToUTCISOString,
+  toISTDateTimeLocal,
+} from "../utils/datetime.js";
 
 const statuses = [
   { value: "todo", label: "Todo" },
@@ -27,27 +32,6 @@ function listFromResponse(data) {
   }
 
   return data?.results ?? [];
-}
-
-function formatDate(value) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function toDateTimeLocal(value) {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
 }
 
 function userLabel(user) {
@@ -207,7 +191,7 @@ function Tasks() {
       description: task.description ?? "",
       status: task.status ?? "todo",
       assignee: task.assignee ? String(task.assignee) : "",
-      due_date: toDateTimeLocal(task.due_date),
+      due_date: toISTDateTimeLocal(task.due_date),
     });
     setError("");
     setSuccessMessage("");
@@ -247,7 +231,7 @@ function Tasks() {
       description: formValues.description.trim(),
       status: formValues.status,
       assignee: formValues.assignee ? Number(formValues.assignee) : null,
-      due_date: formValues.due_date || null,
+      due_date: istDateTimeLocalToUTCISOString(formValues.due_date),
     };
   }
 
@@ -420,7 +404,7 @@ function Tasks() {
                       </td>
                     )}
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {formatDate(task.due_date)}
+                      {formatDateTimeIST(task.due_date)}
                     </td>
                     <td className="px-4 py-3">
                       <select

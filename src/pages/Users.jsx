@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { logout } from "../api/auth.js";
 import { createUser, deleteUser, getUsers, updateUser } from "../api/users.js";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal.jsx";
+import { formatDateTimeIST } from "../utils/datetime.js";
 
 const emptyForm = {
   first_name: "",
@@ -11,17 +12,6 @@ const emptyForm = {
   role: "agent",
   password: "",
 };
-
-function formatDate(value) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 function userListFromResponse(data) {
   if (Array.isArray(data)) {
@@ -260,10 +250,10 @@ function Users() {
                     <td className="px-4 py-3 text-slate-600">{user.email}</td>
                     <td className="px-4 py-3 text-slate-600">{user.role || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {formatDate(user.created_at)}
+                      {formatDateTimeIST(user.created_at)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {formatDate(user.updated_at)}
+                      {formatDateTimeIST(user.updated_at)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <div className="inline-flex gap-2">
