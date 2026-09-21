@@ -49,6 +49,25 @@ export async function fetchCurrentUser(accessToken) {
   return unwrapData(payload);
 }
 
+export async function logoutFromServer() {
+  const accessToken = getAccessToken();
+  const refreshToken = getRefreshToken();
+
+  if (!accessToken) {
+    return null;
+  }
+
+  const payload = await apiRequest("/api/auth/logout/", {
+    method: "POST",
+    token: accessToken,
+    body: {
+      refresh: refreshToken,
+    },
+  });
+
+  return unwrapData(payload);
+}
+
 export function saveAuthSession({ accessToken, refreshToken, user }) {
   const storage = getStorage();
 

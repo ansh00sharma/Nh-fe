@@ -15,8 +15,17 @@ function getToken() {
   return token;
 }
 
-export async function getUsers() {
-  const payload = await apiRequest("/api/users/", {
+export async function getTasks(params = {}) {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, value);
+    }
+  });
+
+  const path = query.toString() ? `/api/tasks/?${query.toString()}` : "/api/tasks/";
+  const payload = await apiRequest(path, {
     method: "GET",
     token: getToken(),
   });
@@ -24,8 +33,8 @@ export async function getUsers() {
   return unwrapData(payload);
 }
 
-export async function createUser(data) {
-  const payload = await apiRequest("/api/users/", {
+export async function createTask(data) {
+  const payload = await apiRequest("/api/tasks/", {
     method: "POST",
     token: getToken(),
     body: data,
@@ -34,8 +43,8 @@ export async function createUser(data) {
   return unwrapData(payload);
 }
 
-export async function updateUser(id, data) {
-  const payload = await apiRequest(`/api/users/${id}/`, {
+export async function updateTask(id, data) {
+  const payload = await apiRequest(`/api/tasks/${id}/`, {
     method: "PATCH",
     token: getToken(),
     body: data,
@@ -44,8 +53,8 @@ export async function updateUser(id, data) {
   return unwrapData(payload);
 }
 
-export async function deleteUser(id) {
-  const payload = await apiRequest(`/api/users/${id}/`, {
+export async function deleteTask(id) {
+  const payload = await apiRequest(`/api/tasks/${id}/`, {
     method: "DELETE",
     token: getToken(),
   });

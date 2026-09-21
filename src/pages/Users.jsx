@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../api/auth.js";
-import { createUser, getUsers, updateUser } from "../api/users.js";
+import { createUser, deleteUser, getUsers, updateUser } from "../api/users.js";
+import DeleteConfirmationModal from "../components/DeleteConfirmationModal.jsx";
 
 const emptyForm = {
   first_name: "",
@@ -39,6 +40,8 @@ function Users() {
   const [successMessage, setSuccessMessage] = useState("");
   const [modalMode, setModalMode] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formValues, setFormValues] = useState(emptyForm);
 
   const isModalOpen = Boolean(modalMode);
@@ -173,6 +176,35 @@ function Users() {
     }
   }
 
+  function openDeleteModal(user) {
+    setUserToDelete(user);
+    setError("");
+    setSuccessMessage("");
+  }
+
+  async function confirmDeleteUser() {
+    if (!userToDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      await deleteUser(userToDelete.id);
+      setUsers((current) => current.filter((user) => user.id !== userToDelete.id));
+      setSuccessMessage("User deleted successfully.");
+      setUserToDelete(null);
+    } catch (apiError) {
+      if (!handleAuthError(apiError)) {
+        setError(apiError.message || "Could not delete user.");
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -234,13 +266,22 @@ function Users() {
                       {formatDate(user.updated_at)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(user)}
-                        className="rounded border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Edit
-                      </button>
+                      <div className="inline-flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(user)}
+                          className="rounded border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDeleteModal(user)}
+                          className="rounded border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -363,6 +404,20 @@ function Users() {
             </form>
           </section>
         </div>
+      )}
+
+      {userToDelete && (
+        <DeleteConfirmationModal
+          title="Delete User"
+          description={`Are you sure you want to delete "${userToDelete.email}"? This action cannot be undone.`}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            if (!isDeleting) {
+              setUserToDelete(null);
+            }
+          }}
+          onDelete={confirmDeleteUser}
+        />
       )}
     </div>
   );
