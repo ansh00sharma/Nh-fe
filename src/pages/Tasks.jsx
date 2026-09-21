@@ -34,6 +34,22 @@ function listFromResponse(data) {
   return data?.results ?? [];
 }
 
+function paginationFromResponse(data) {
+  if (Array.isArray(data)) {
+    return {
+      count: data.length,
+      next: null,
+      previous: null,
+    };
+  }
+
+  return {
+    count: data?.count ?? 0,
+    next: data?.next ?? null,
+    previous: data?.previous ?? null,
+  };
+}
+
 function userLabel(user) {
   const name = [user.first_name, user.last_name].filter(Boolean).join(" ");
   return name ? `${name} (${user.email})` : user.email;
@@ -94,11 +110,24 @@ function TaskTitle({ task }) {
 function Tasks() {
   const navigate = useNavigate();
   const currentUser = getStoredUser();
-  const isManager = currentUser?.role === "manager";
+  const canManageTasks = currentUser?.role === "admin" || currentUser?.role === "manager";
 
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
+  const [filters, setFilters] = useState({
+    status: "",
+    assignee: "",
+    due_date_from: "",
+    due_date_to: "",
+  });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState({
+    count: 0,
+    next: null,
+    previous: null,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -112,7 +141,7 @@ function Tasks() {
 
   const isModalOpen = Boolean(modalMode);
   const modalTitle = modalMode === "edit" ? "Edit Task" : "Create Task";
-  const visibleTabs = isManager
+  const visibleTabs = canManageTasks
     ? [
         { id: "assigned", label: "Assigned" },
         { id: "created", label: "Created" },
@@ -120,7 +149,11 @@ function Tasks() {
     : [{ id: "assigned", label: "Assigned" }];
   const showAssigneeColumn = activeTab === "created";
   const showAssignedByColumn = activeTab === "assigned";
+  const showAssigneeFilter = canManageTasks && activeTab === "created";
   const displayedTasks = useMemo(() => tasks, [tasks]);
+  const totalPages = Math.max(1, Math.ceil(pagination.count / pageSize));
+  const firstVisibleTask = pagination.count === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastVisibleTask = Math.min(page * pageSize, pagination.count);
 
   function handleAuthError(apiError) {
     if (apiError?.status === 401) {
@@ -132,11 +165,27 @@ function Tasks() {
   }
 
   function getTaskFilters() {
+    const params = {
+      page,
+      page_size: pageSize,
+    };
+
+    if (filters.status) {
+      params.status = filters.status;
+    }
+    if (filters.due_date_from) {
+      params.due_date_from = filters.due_date_from;
+    }
+    if (filters.due_date_to) {
+      params.due_date_to = filters.due_date_to;
+    }
     if (activeTab === "assigned" && currentUser?.id) {
-      return { assignee: currentUser.id };
+      params.assignee = currentUser.id;
+    } else if (filters.assignee) {
+      params.assignee = filters.assignee;
     }
 
-    return {};
+    return params;
   }
 
   async function loadTasks() {
@@ -146,8 +195,9 @@ function Tasks() {
     try {
       const taskData = await getTasks(getTaskFilters());
       setTasks(listFromResponse(taskData));
+      setPagination(paginationFromResponse(taskData));
 
-      if (isManager) {
+      if (canManageTasks) {
         const [projectData, userData] = await Promise.all([getProjects(), getUsers()]);
         setProjects(listFromResponse(projectData));
         setUsers(listFromResponse(userData));
@@ -163,13 +213,52 @@ function Tasks() {
 
   useEffect(() => {
     loadTasks();
-  }, [activeTab]);
+  }, [
+    activeTab,
+    filters.status,
+    filters.assignee,
+    filters.due_date_from,
+    filters.due_date_to,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
-    if (!isManager) {
+    if (!canManageTasks) {
       setActiveTab("assigned");
     }
-  }, [isManager]);
+  }, [canManageTasks]);
+
+  function handleTabChange(tabId) {
+    setActiveTab(tabId);
+    setPage(1);
+    if (tabId === "assigned") {
+      setFilters((current) => ({ ...current, assignee: "" }));
+    }
+  }
+
+  function updateFilter(field, value) {
+    setFilters((current) => ({
+      ...current,
+      [field]: value,
+    }));
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setFilters({
+      status: "",
+      assignee: "",
+      due_date_from: "",
+      due_date_to: "",
+    });
+    setPage(1);
+  }
+
+  function handlePageSizeChange(value) {
+    setPageSize(Number(value));
+    setPage(1);
+  }
 
   function openCreateModal() {
     setModalMode("create");
@@ -274,9 +363,7 @@ function Tasks() {
 
     try {
       await updateTask(task.id, { status });
-      setTasks((current) =>
-        current.map((item) => (item.id === task.id ? { ...item, status } : item)),
-      );
+      await loadTasks();
       setSuccessMessage("Task status updated successfully.");
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
@@ -302,9 +389,13 @@ function Tasks() {
 
     try {
       await deleteTask(taskToDelete.id);
-      setTasks((current) => current.filter((task) => task.id !== taskToDelete.id));
       setSuccessMessage("Task deleted successfully.");
       setTaskToDelete(null);
+      if (tasks.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+      } else {
+        await loadTasks();
+      }
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
         setError(apiError.message || "Could not delete task.");
@@ -320,7 +411,7 @@ function Tasks() {
         <div>
           <h1 className="text-3xl font-semibold text-slate-900">Tasks</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {isManager ? "Manage project tasks" : "Work on your assigned tasks"}
+            {canManageTasks ? "Manage project tasks" : "Work on your assigned tasks"}
           </p>
         </div>
       </div>
@@ -331,7 +422,7 @@ function Tasks() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`rounded px-3 py-1.5 text-sm font-medium ${
                 activeTab === tab.id
                   ? "bg-slate-900 text-white"
@@ -342,7 +433,7 @@ function Tasks() {
             </button>
           ))}
         </div>
-        {isManager && (
+        {canManageTasks && (
           <button
             type="button"
             onClick={openCreateModal}
@@ -365,6 +456,107 @@ function Tasks() {
         </div>
       )}
 
+      <section className="rounded border border-slate-200 bg-white p-4">
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-status-filter">
+              Status
+            </label>
+            <select
+              id="task-status-filter"
+              value={filters.status}
+              onChange={(event) => updateFilter("status", event.target.value)}
+              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            >
+              <option value="">All Statuses</option>
+              {statuses.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {showAssigneeFilter && (
+            <div>
+              <label
+                className="mb-2 block text-sm font-medium text-slate-700"
+                htmlFor="task-assignee-filter"
+              >
+                Assignee
+              </label>
+              <select
+                id="task-assignee-filter"
+                value={filters.assignee}
+                onChange={(event) => updateFilter("assignee", event.target.value)}
+                className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="">All Assignees</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {userLabel(user)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-due-from">
+              Due From
+            </label>
+            <input
+              id="task-due-from"
+              type="date"
+              value={filters.due_date_from}
+              onChange={(event) => updateFilter("due_date_from", event.target.value)}
+              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-due-to">
+              Due To
+            </label>
+            <input
+              id="task-due-to"
+              type="date"
+              value={filters.due_date_to}
+              onChange={(event) => updateFilter("due_date_to", event.target.value)}
+              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-page-size">
+              Page Size
+            </label>
+            <select
+              id="task-page-size"
+              value={pageSize}
+              onChange={(event) => handlePageSizeChange(event.target.value)}
+              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            >
+              {[10, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Clear Filters
+          </button>
+        </div>
+      </section>
+
       <section className="rounded border border-slate-200 bg-white">
         {isLoading ? (
           <div className="p-6 text-sm text-slate-500">Loading tasks...</div>
@@ -381,7 +573,7 @@ function Tasks() {
                   {showAssignedByColumn && <th className="px-4 py-3">Assigned By</th>}
                   <th className="px-4 py-3">Due Date</th>
                   <th className="px-4 py-3">Status</th>
-                  {isManager && <th className="px-4 py-3 text-right">Actions</th>}
+                  {canManageTasks && <th className="px-4 py-3 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -419,7 +611,7 @@ function Tasks() {
                         ))}
                       </select>
                     </td>
-                    {isManager && (
+                    {canManageTasks && (
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="inline-flex gap-2">
                           <button
@@ -446,6 +638,33 @@ function Tasks() {
           </div>
         )}
       </section>
+
+      <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          Showing {firstVisibleTask}-{lastVisibleTask} of {pagination.count} tasks
+        </div>
+        <div className="inline-flex self-start rounded border border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={!pagination.previous || page <= 1 || isLoading}
+            className="border-r border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
+          >
+            Previous
+          </button>
+          <span className="px-3 py-2 text-slate-500">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((current) => current + 1)}
+            disabled={!pagination.next || isLoading}
+            className="border-l border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
+          >
+            Next
+          </button>
+        </div>
+      </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4">

@@ -2,6 +2,27 @@ import { NavLink } from "react-router-dom";
 
 const navItems = [
   {
+    label: "Dashboard",
+    path: "/dashboard",
+    module: "dashboard",
+    icon: (
+      <svg
+        aria-hidden="true"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 13.5h6.5V4H4v9.5ZM13.5 20H20v-9.5h-6.5V20ZM4 20h6.5v-3.5H4V20ZM13.5 7.5H20V4h-6.5v3.5Z"
+        />
+      </svg>
+    ),
+  },
+  {
     label: "Users",
     path: "/users",
     module: "users",

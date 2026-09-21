@@ -123,6 +123,10 @@ export function hasModuleAccess(moduleName, user = getStoredUser()) {
 }
 
 export function getDefaultAuthenticatedPath(user = getStoredUser()) {
+  if (hasModuleAccess("dashboard", user)) {
+    return "/dashboard";
+  }
+
   if (hasModuleAccess("projects", user)) {
     return "/projects";
   }
