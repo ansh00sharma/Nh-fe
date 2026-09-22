@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import {
   fetchCurrentUser,
   getAccessToken,
@@ -13,7 +13,9 @@ import Sidebar from "../components/Sidebar.jsx";
 
 function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [user, setUser] = useState(() => getStoredUser());
+  const location = useLocation();
 
   useEffect(() => {
     const accessToken = getAccessToken();
@@ -44,16 +46,26 @@ function AppLayout() {
     };
   }, []);
 
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <Navbar initials={getUserInitials(user)} />
-      <div className="flex h-[calc(100vh-4rem)] min-h-0">
+    <div className="app-shell min-h-screen text-slate-950">
+      <Navbar
+        initials={getUserInitials(user)}
+        user={user}
+        onMenuToggle={() => setMobileSidebarOpen((current) => !current)}
+      />
+      <div className="flex h-[calc(100vh-4.25rem)] min-h-0">
         <Sidebar
           collapsed={sidebarCollapsed}
+          mobileOpen={mobileSidebarOpen}
           onToggle={() => setSidebarCollapsed((current) => !current)}
+          onClose={() => setMobileSidebarOpen(false)}
           modules={user?.modules}
         />
-        <main className="min-w-0 flex-1 overflow-auto p-8">
+        <main className="relative min-w-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>

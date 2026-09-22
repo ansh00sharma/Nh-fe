@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { parseAsInteger, useQueryState } from "nuqs";
 import { useNavigate } from "react-router-dom";
 import { getStoredUser, logout } from "../api/auth.js";
 import { getProjects } from "../api/projects.js";
-import { createTask, deleteTask, getTasks, updateTask } from "../api/tasks.js";
+import { createTask, deleteTask, getTask, getTasks, updateTask } from "../api/tasks.js";
 import { getUsers } from "../api/users.js";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal.jsx";
 import {
@@ -16,6 +17,12 @@ const statuses = [
   { value: "in_progress", label: "In Progress" },
   { value: "done", label: "Done" },
 ];
+
+const statusStyles = {
+  todo: "border-slate-200 bg-slate-50 text-slate-700",
+  in_progress: "border-sky-200 bg-sky-50 text-sky-700",
+  done: "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
 
 const emptyForm = {
   project: "",
@@ -55,12 +62,408 @@ function userLabel(user) {
   return name ? `${name} (${user.email})` : user.email;
 }
 
-function TaskTitle({ task }) {
+function statusLabel(value) {
+  return statuses.find((status) => status.value === value)?.label || value || "-";
+}
+
+function getTaskInitials(task) {
+  return (
+    task.title
+      ?.split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "TS"
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function ClipboardIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 5.5h6M9.5 4h5A1.5 1.5 0 0 1 16 5.5V7H8V5.5A1.5 1.5 0 0 1 9.5 4ZM6.5 6.5h11A1.5 1.5 0 0 1 19 8v10.5A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5V8a1.5 1.5 0 0 1 1.5-1.5ZM8.5 12h7M8.5 16h5"
+      />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v6A2.5 2.5 0 0 1 17.5 18h-11A2.5 2.5 0 0 1 4 15.5v-8Z"
+      />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.5 19v-1.3a3.2 3.2 0 0 0-3.2-3.2H7.7a3.2 3.2 0 0 0-3.2 3.2V19M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM18.5 19v-1a3 3 0 0 0-2-2.8M16.5 5a3.4 3.4 0 0 1 0 6"
+      />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 4v3M17 4v3M5 9h14M6.5 6h11A1.5 1.5 0 0 1 19 7.5v10A1.5 1.5 0 0 1 17.5 19h-11A1.5 1.5 0 0 1 5 17.5v-10A1.5 1.5 0 0 1 6.5 6Z"
+      />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.75 12s3.5-6.25 9.25-6.25S21.25 12 21.25 12 17.75 18.25 12 18.25 2.75 12 2.75 12Z"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14.75a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m16.9 4.7 2.4 2.4M5 19l4.6-1 9.1-9.1a1.7 1.7 0 0 0 0-2.4l-1.2-1.2a1.7 1.7 0 0 0-2.4 0L6 14.4 5 19Z"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 4h6m-8 4h10m-9 0 .7 11A2 2 0 0 0 10.7 21h2.6a2 2 0 0 0 2-1.9L16 8M10 11v6M14 11v6"
+      />
+    </svg>
+  );
+}
+
+function ToastIcon({ type }) {
+  if (type === "error") {
+    return (
+      <svg
+        aria-hidden="true"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 8v5m0 3h.01M10.3 4.5 3.6 16A2 2 0 0 0 5.3 19h13.4a2 2 0 0 0 1.7-3L13.7 4.5a2 2 0 0 0-3.4 0Z"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+function TasksToast({ toast, onClose }) {
+  if (!toast) {
+    return null;
+  }
+
+  const isError = toast.type === "error";
+
+  return (
+    <div className="fixed right-4 top-24 z-50 w-[calc(100%-2rem)] max-w-sm sm:right-6">
+      <div
+        className={`toast-card flex items-start gap-3 rounded-lg border bg-white p-4 shadow-2xl shadow-slate-900/12 ${
+          isError ? "border-red-200" : "border-emerald-200"
+        }`}
+        role="status"
+      >
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+            isError ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+          }`}
+        >
+          <ToastIcon type={toast.type} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-950">
+            {isError ? "Action failed" : "Action complete"}
+          </p>
+          <p className="mt-0.5 text-sm leading-5 text-slate-600">{toast.message}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          aria-label="Dismiss notification"
+        >
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DetailItem({ icon, label, value }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+        <span className="text-slate-400">{icon}</span>
+        {label}
+      </div>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">{value || "-"}</p>
+    </div>
+  );
+}
+
+function TaskDetailModal({ task, taskId, isLoading, state, onClose }) {
+  const isDeleted = state === "deleted";
+  const hasError = state === "error";
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+      <section className="modal-card w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-950 to-sky-700 text-white shadow-lg shadow-slate-900/15">
+              <ClipboardIcon />
+            </span>
+            <div>
+              <h2 className="text-xl font-bold text-slate-950">
+                {task?.title || `Task #${taskId}`}
+              </h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                Direct task link details
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+            aria-label="Close task details"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="grid gap-3 p-6">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="h-16 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
+        ) : isDeleted ? (
+          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <TrashIcon />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-950">This task was deleted</h3>
+            <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
+              The task link is valid, but the backend did not return an active task record.
+            </p>
+          </div>
+        ) : hasError ? (
+          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <ToastIcon type="error" />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-950">Could not load this task</h3>
+            <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
+              Please refresh or check whether you still have access to this task.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5 p-6">
+            <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-950 via-slate-800 to-sky-700 text-sm font-bold text-white shadow-md shadow-slate-900/10">
+                  {getTaskInitials(task)}
+                </span>
+                <div>
+                  <h3 className="mt-1 text-lg font-bold text-slate-950">{task.title}</h3>
+                </div>
+              </div>
+              <span
+                className={`inline-flex self-start rounded-full border px-3 py-1 text-xs font-bold sm:self-center ${
+                  statusStyles[task.status] || "border-slate-200 bg-slate-50 text-slate-700"
+                }`}
+              >
+                {statusLabel(task.status)}
+              </span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <DetailItem
+                icon={<FolderIcon />}
+                label="Project"
+                value={task.project_name || `Project #${task.project}`}
+              />
+              <DetailItem
+                icon={<UserIcon />}
+                label="Assignee"
+                value={task.assignee_name || task.assignee_email || "Unassigned"}
+              />
+              <DetailItem
+                icon={<UserIcon />}
+                label="Assigned By"
+                value={task.assigned_by_name || task.assigned_by_email || "-"}
+              />
+              <DetailItem
+                icon={<CalendarIcon />}
+                label="Due"
+                value={formatDateTimeIST(task.due_date)}
+              />
+              <DetailItem
+                icon={<CalendarIcon />}
+                label="Created"
+                value={formatDateTimeIST(task.created_at)}
+              />
+              <DetailItem
+                icon={<CalendarIcon />}
+                label="Updated"
+                value={formatDateTimeIST(task.updated_at)}
+              />
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                <ClipboardIcon />
+                Description
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
+                {task.description || "No description was added for this task."}
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function TaskTitle({ task, onOpen }) {
   const [tooltipPosition, setTooltipPosition] = useState(null);
 
   function showTooltip(event) {
     const rect = event.currentTarget.getBoundingClientRect();
-    const tooltipWidth = 260;
+    const tooltipWidth = 280;
     const horizontalPadding = 16;
     const left = Math.min(
       Math.max(rect.left + rect.width / 2, tooltipWidth / 2 + horizontalPadding),
@@ -74,35 +477,54 @@ function TaskTitle({ task }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="font-medium text-slate-900">{task.title}</span>
-      {task.description && (
-        <>
+    <div className="flex min-w-72 items-center gap-3">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-950 via-slate-800 to-sky-700 text-sm font-bold text-white shadow-md shadow-slate-900/10 transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-sky-200"
+        aria-label={`Open details for ${task.title}`}
+      >
+        {getTaskInitials(task)}
+      </button>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Task description"
-            onMouseEnter={showTooltip}
-            onMouseLeave={() => setTooltipPosition(null)}
-            onFocus={showTooltip}
-            onBlur={() => setTooltipPosition(null)}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-xs font-semibold text-slate-600 hover:border-slate-400 hover:bg-white hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            onClick={onOpen}
+            className="truncate text-left font-bold text-slate-950 transition hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
           >
-            i
+            {task.title}
           </button>
-          {tooltipPosition && (
-            <div
-              className="pointer-events-none fixed z-50 max-w-[260px] rounded border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-normal leading-5 text-white shadow-xl"
-              style={{
-                left: tooltipPosition.left,
-                top: tooltipPosition.top,
-                transform: "translateX(-50%)",
-              }}
-            >
-              {task.description}
-            </div>
+          {task.description && (
+            <>
+              <button
+                type="button"
+                aria-label="Task description"
+                onMouseEnter={showTooltip}
+                onMouseLeave={() => setTooltipPosition(null)}
+                onFocus={showTooltip}
+                onBlur={() => setTooltipPosition(null)}
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              >
+                i
+              </button>
+              {tooltipPosition && (
+                <div
+                  className="pointer-events-none fixed z-50 max-w-[280px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-medium leading-5 text-white shadow-xl"
+                  style={{
+                    left: tooltipPosition.left,
+                    top: tooltipPosition.top,
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  {task.description}
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+        {/* <p className="mt-0.5 text-xs font-medium text-slate-500">Task ID #{task.id}</p> */}
+      </div>
     </div>
   );
 }
@@ -111,6 +533,7 @@ function Tasks() {
   const navigate = useNavigate();
   const currentUser = getStoredUser();
   const canManageTasks = currentUser?.role === "admin" || currentUser?.role === "manager";
+  const [selectedTaskId, setSelectedTaskId] = useQueryState("task", parseAsInteger);
 
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -132,21 +555,25 @@ function Tasks() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [modalMode, setModalMode] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [formValues, setFormValues] = useState(emptyForm);
   const [activeTab, setActiveTab] = useState("assigned");
+  const [toast, setToast] = useState(null);
+  const [taskDetail, setTaskDetail] = useState(null);
+  const [taskDetailState, setTaskDetailState] = useState("idle");
+  const [isTaskDetailLoading, setIsTaskDetailLoading] = useState(false);
 
   const isModalOpen = Boolean(modalMode);
+  const isTaskDetailOpen = selectedTaskId !== null;
   const modalTitle = modalMode === "edit" ? "Edit Task" : "Create Task";
   const visibleTabs = canManageTasks
     ? [
-        { id: "assigned", label: "Assigned" },
-        { id: "created", label: "Created" },
+        { id: "assigned", label: "Assigned To Me" },
+        { id: "created", label: "Created By Me" },
       ]
-    : [{ id: "assigned", label: "Assigned" }];
+    : [{ id: "assigned", label: "Assigned To Me" }];
   const showAssigneeColumn = activeTab === "created";
   const showAssignedByColumn = activeTab === "assigned";
   const showAssigneeFilter = canManageTasks && activeTab === "created";
@@ -154,6 +581,12 @@ function Tasks() {
   const totalPages = Math.max(1, Math.ceil(pagination.count / pageSize));
   const firstVisibleTask = pagination.count === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastVisibleTask = Math.min(page * pageSize, pagination.count);
+  const activeFiltersCount = [
+    filters.status,
+    filters.assignee,
+    filters.due_date_from,
+    filters.due_date_to,
+  ].filter(Boolean).length;
 
   function handleAuthError(apiError) {
     if (apiError?.status === 401) {
@@ -204,7 +637,9 @@ function Tasks() {
       }
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
-        setError(apiError.message || "Could not load tasks.");
+        const message = apiError.message || "Could not load tasks.";
+        setError(message);
+        setToast({ type: "error", message });
       }
     } finally {
       setIsLoading(false);
@@ -228,6 +663,63 @@ function Tasks() {
       setActiveTab("assigned");
     }
   }, [canManageTasks]);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToast(null);
+    }, 4200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
+  useEffect(() => {
+    if (selectedTaskId === null) {
+      setTaskDetail(null);
+      setTaskDetailState("idle");
+      setIsTaskDetailLoading(false);
+      return undefined;
+    }
+
+    let ignore = false;
+    setTaskDetail(null);
+    setTaskDetailState("idle");
+    setIsTaskDetailLoading(true);
+
+    getTask(selectedTaskId)
+      .then((data) => {
+        if (ignore) {
+          return;
+        }
+
+        if (!data?.id) {
+          setTaskDetailState("deleted");
+          return;
+        }
+
+        setTaskDetail(data);
+        setTaskDetailState("ready");
+      })
+      .catch((apiError) => {
+        if (ignore || handleAuthError(apiError)) {
+          return;
+        }
+
+        setTaskDetailState(apiError?.status === 404 ? "deleted" : "error");
+      })
+      .finally(() => {
+        if (!ignore) {
+          setIsTaskDetailLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedTaskId]);
 
   function handleTabChange(tabId) {
     setActiveTab(tabId);
@@ -261,6 +753,7 @@ function Tasks() {
   }
 
   function openCreateModal() {
+    setSelectedTaskId(null);
     setModalMode("create");
     setSelectedTask(null);
     setFormValues({
@@ -268,10 +761,11 @@ function Tasks() {
       project: projects[0]?.id ? String(projects[0].id) : "",
     });
     setError("");
-    setSuccessMessage("");
+    setToast(null);
   }
 
   function openEditModal(task) {
+    setSelectedTaskId(null);
     setModalMode("edit");
     setSelectedTask(task);
     setFormValues({
@@ -283,7 +777,7 @@ function Tasks() {
       due_date: toISTDateTimeLocal(task.due_date),
     });
     setError("");
-    setSuccessMessage("");
+    setToast(null);
   }
 
   function closeModal({ force = false } = {}) {
@@ -294,6 +788,14 @@ function Tasks() {
     setModalMode(null);
     setSelectedTask(null);
     setFormValues(emptyForm);
+  }
+
+  function openTaskDetail(task) {
+    setSelectedTaskId(task.id);
+  }
+
+  function closeTaskDetail() {
+    setSelectedTaskId(null);
   }
 
   function updateFormValue(field, value) {
@@ -335,22 +837,23 @@ function Tasks() {
 
     setIsSaving(true);
     setError("");
-    setSuccessMessage("");
 
     try {
       if (modalMode === "edit" && selectedTask) {
         await updateTask(selectedTask.id, buildTaskPayload());
-        setSuccessMessage("Task updated successfully.");
+        setToast({ type: "success", message: "Task updated successfully." });
       } else {
         await createTask(buildTaskPayload());
-        setSuccessMessage("Task created successfully.");
+        setToast({ type: "success", message: "Task created successfully." });
       }
 
       closeModal({ force: true });
       await loadTasks();
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
-        setError(apiError.message || "Could not save task.");
+        const message = apiError.message || "Could not save task.";
+        setError(message);
+        setToast({ type: "error", message });
       }
     } finally {
       setIsSaving(false);
@@ -359,15 +862,16 @@ function Tasks() {
 
   async function handleStatusChange(task, status) {
     setError("");
-    setSuccessMessage("");
 
     try {
       await updateTask(task.id, { status });
       await loadTasks();
-      setSuccessMessage("Task status updated successfully.");
+      setToast({ type: "success", message: "Task status updated successfully." });
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
-        setError(apiError.message || "Could not update task status.");
+        const message = apiError.message || "Could not update task status.";
+        setError(message);
+        setToast({ type: "error", message });
       }
     }
   }
@@ -375,7 +879,7 @@ function Tasks() {
   function openDeleteModal(task) {
     setTaskToDelete(task);
     setError("");
-    setSuccessMessage("");
+    setToast(null);
   }
 
   async function confirmDeleteTask() {
@@ -385,11 +889,10 @@ function Tasks() {
 
     setIsDeleting(true);
     setError("");
-    setSuccessMessage("");
 
     try {
       await deleteTask(taskToDelete.id);
-      setSuccessMessage("Task deleted successfully.");
+      setToast({ type: "success", message: "Task deleted successfully." });
       setTaskToDelete(null);
       if (tasks.length === 1 && page > 1) {
         setPage((current) => Math.max(1, current - 1));
@@ -398,7 +901,9 @@ function Tasks() {
       }
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
-        setError(apiError.message || "Could not delete task.");
+        const message = apiError.message || "Could not delete task.";
+        setError(message);
+        setToast({ type: "error", message });
       }
     } finally {
       setIsDeleting(false);
@@ -407,202 +912,256 @@ function Tasks() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Tasks</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {canManageTasks ? "Manage project tasks" : "Work on your assigned tasks"}
+      <TasksToast toast={toast} onClose={() => setToast(null)} />
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-950">
+            Tasks
+          </h1>
+          <p className="text-sm font-medium text-slate-500">
+            {canManageTasks
+              ? "Plan, assign, and monitor project tasks."
+              : "Track and update your assigned work."}
           </p>
         </div>
-      </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex self-start rounded border border-slate-200 bg-white p-1">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${
-                activeTab === tab.id
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
         {canManageTasks && (
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center justify-center rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-sky-700 hover:shadow-sky-900/20 focus:outline-none focus:ring-2 focus:ring-sky-300"
           >
+            <PlusIcon />
             Create Task
           </button>
         )}
       </div>
 
-      {successMessage && (
-        <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {successMessage}
-        </div>
-      )}
+      <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/[0.04]">
+        <div className="border-b border-slate-100 bg-white px-5 py-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-950">Task Board</h2>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                Showing {firstVisibleTask}-{lastVisibleTask} of {pagination.count} tasks
+              </p>
+            </div>
 
-      {error && !isModalOpen && !taskToDelete && (
-        <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+            <div className="overflow-x-auto">
+              <div className="inline-flex min-w-max rounded-lg border border-slate-200 bg-slate-50 p-1">
+                {visibleTabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
 
-      <section className="rounded border border-slate-200 bg-white p-4">
-        <div className="grid gap-4 lg:grid-cols-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-status-filter">
-              Status
-            </label>
-            <select
-              id="task-status-filter"
-              value={filters.status}
-              onChange={(event) => updateFilter("status", event.target.value)}
-              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-            >
-              <option value="">All Statuses</option>
-              {statuses.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-bold transition ${
+                        isActive
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-slate-500 hover:bg-white/70 hover:text-slate-800"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+        </div>
 
-          {showAssigneeFilter && (
+        <div className="border-b border-slate-100 bg-slate-50/50 p-5">
+          <div className="grid gap-4 lg:grid-cols-5">
             <div>
               <label
-                className="mb-2 block text-sm font-medium text-slate-700"
-                htmlFor="task-assignee-filter"
+                className="mb-2 block text-sm font-bold text-slate-700"
+                htmlFor="task-status-filter"
               >
-                Assignee
+                Status
               </label>
               <select
-                id="task-assignee-filter"
-                value={filters.assignee}
-                onChange={(event) => updateFilter("assignee", event.target.value)}
-                className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                id="task-status-filter"
+                value={filters.status}
+                onChange={(event) => updateFilter("status", event.target.value)}
+                className="block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
               >
-                <option value="">All Assignees</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {userLabel(user)}
+                <option value="">All Statuses</option>
+                {statuses.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
                   </option>
                 ))}
               </select>
             </div>
-          )}
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-due-from">
-              Due From
-            </label>
-            <input
-              id="task-due-from"
-              type="date"
-              value={filters.due_date_from}
-              onChange={(event) => updateFilter("due_date_from", event.target.value)}
-              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-            />
+            {showAssigneeFilter && (
+              <div>
+                <label
+                  className="mb-2 block text-sm font-bold text-slate-700"
+                  htmlFor="task-assignee-filter"
+                >
+                  Assignee
+                </label>
+                <select
+                  id="task-assignee-filter"
+                  value={filters.assignee}
+                  onChange={(event) => updateFilter("assignee", event.target.value)}
+                  className="block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                >
+                  <option value="">All Assignees</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {userLabel(user)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label
+                className="mb-2 block text-sm font-bold text-slate-700"
+                htmlFor="task-due-from"
+              >
+                Due From
+              </label>
+              <input
+                id="task-due-from"
+                type="date"
+                value={filters.due_date_from}
+                onChange={(event) => updateFilter("due_date_from", event.target.value)}
+                className="block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+              />
+            </div>
+
+            <div>
+              <label
+                className="mb-2 block text-sm font-bold text-slate-700"
+                htmlFor="task-due-to"
+              >
+                Due To
+              </label>
+              <input
+                id="task-due-to"
+                type="date"
+                value={filters.due_date_to}
+                onChange={(event) => updateFilter("due_date_to", event.target.value)}
+                className="block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+              />
+            </div>
+
+            <div>
+              <label
+                className="mb-2 block text-sm font-bold text-slate-700"
+                htmlFor="task-page-size"
+              >
+                Page Size
+              </label>
+              <select
+                id="task-page-size"
+                value={pageSize}
+                onChange={(event) => handlePageSizeChange(event.target.value)}
+                className="block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+              >
+                {[10, 20, 50].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-due-to">
-              Due To
-            </label>
-            <input
-              id="task-due-to"
-              type="date"
-              value={filters.due_date_to}
-              onChange={(event) => updateFilter("due_date_to", event.target.value)}
-              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="task-page-size">
-              Page Size
-            </label>
-            <select
-              id="task-page-size"
-              value={pageSize}
-              onChange={(event) => handlePageSizeChange(event.target.value)}
-              className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="inline-flex self-start rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+              {activeFiltersCount} active {activeFiltersCount === 1 ? "filter" : "filters"}
+            </div>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
-              {[10, 20, 50].map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
+              Clear Filters
+            </button>
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="rounded border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Clear Filters
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded border border-slate-200 bg-white">
         {isLoading ? (
-          <div className="p-6 text-sm text-slate-500">Loading tasks...</div>
+          <div className="grid gap-3 p-5">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="h-16 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
         ) : displayedTasks.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500">No tasks found.</div>
+          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+              <ClipboardIcon />
+            </div>
+            <h3 className="mt-4 text-sm font-bold text-slate-950">No tasks found</h3>
+            <p className="mt-1 max-w-sm text-sm text-slate-500">
+              Adjust filters or create a task to start tracking work here.
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Task</th>
-                  <th className="px-4 py-3">Project</th>
-                  {showAssigneeColumn && <th className="px-4 py-3">Assignee</th>}
-                  {showAssignedByColumn && <th className="px-4 py-3">Assigned By</th>}
-                  <th className="px-4 py-3">Due Date</th>
-                  <th className="px-4 py-3">Status</th>
-                  {canManageTasks && <th className="px-4 py-3 text-right">Actions</th>}
+                  <th className="px-5 py-4">Task</th>
+                  <th className="px-5 py-4">Project</th>
+                  {showAssigneeColumn && <th className="px-5 py-4">Assigned To</th>}
+                  {showAssignedByColumn && <th className="px-5 py-4">Assigned By</th>}
+                  <th className="px-5 py-4">Due</th>
+                  <th className="px-5 py-4">Status</th>
+                  {canManageTasks && <th className="px-5 py-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {displayedTasks.map((task) => (
-                  <tr key={task.id} className="align-top">
-                    <td className="max-w-sm px-4 py-3">
-                      <TaskTitle task={task} />
+                  <tr key={task.id} className="group align-middle transition hover:bg-sky-50/35">
+                    <td className="px-5 py-4">
+                      <TaskTitle task={task} onOpen={() => openTaskDetail(task)} />
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {task.project_name || `Project #${task.project}`}
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <span className="max-w-52 truncate font-medium">
+                          {task.project_name || `Project #${task.project}`}
+                        </span>
+                      </div>
                     </td>
                     {showAssigneeColumn && (
-                      <td className="px-4 py-3 text-slate-600">
-                        {task.assignee_name || task.assignee_email || "-"}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2 text-slate-600">                          
+                          <span className="max-w-52 truncate font-medium">
+                            {task.assignee_name || task.assignee_email || "Unassigned"}
+                          </span>
+                        </div>
                       </td>
                     )}
                     {showAssignedByColumn && (
-                      <td className="px-4 py-3 text-slate-600">
-                        {task.assigned_by_name || task.assigned_by_email || "-"}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <span className="max-w-52 truncate font-medium">
+                            {task.assigned_by_name || task.assigned_by_email || "-"}
+                          </span>
+                        </div>
                       </td>
                     )}
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {formatDateTimeIST(task.due_date)}
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <span className="font-medium">{formatDateTimeIST(task.due_date)}</span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <select
                         value={task.status}
                         onChange={(event) => handleStatusChange(task, event.target.value)}
-                        className="rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                        className={`h-9 rounded-lg border px-2.5 text-sm font-bold outline-none transition focus:ring-4 focus:ring-sky-100 ${
+                          statusStyles[task.status] || "border-slate-200 bg-slate-50 text-slate-700"
+                        }`}
                       >
                         {statuses.map((status) => (
                           <option key={status.value} value={status.value}>
@@ -612,20 +1171,30 @@ function Tasks() {
                       </select>
                     </td>
                     {canManageTasks && (
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <td className="whitespace-nowrap px-5 py-4 text-right">
                         <div className="inline-flex gap-2">
                           <button
                             type="button"
-                            onClick={() => openEditModal(task)}
-                            className="rounded border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            onClick={() => openTaskDetail(task)}
+                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
                           >
+                            <EyeIcon />
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(task)}
+                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          >
+                            <PencilIcon />
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => openDeleteModal(task)}
-                            className="rounded border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-bold text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
                           >
+                            <TrashIcon />
                             Delete
                           </button>
                         </div>
@@ -640,26 +1209,26 @@ function Tasks() {
       </section>
 
       <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="font-medium">
           Showing {firstVisibleTask}-{lastVisibleTask} of {pagination.count} tasks
         </div>
-        <div className="inline-flex self-start rounded border border-slate-200 bg-white">
+        <div className="inline-flex self-start overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <button
             type="button"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={!pagination.previous || page <= 1 || isLoading}
-            className="border-r border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
+            className="px-3 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
           >
             Previous
           </button>
-          <span className="px-3 py-2 text-slate-500">
+          <span className="border-x border-slate-200 px-3 py-2 font-semibold text-slate-500">
             Page {page} of {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setPage((current) => current + 1)}
             disabled={!pagination.next || isLoading}
-            className="border-l border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
+            className="px-3 py-2 font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
           >
             Next
           </button>
@@ -667,99 +1236,81 @@ function Tasks() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-900/40 p-4">
-          <section className="w-full max-w-lg rounded border border-slate-200 bg-white p-6 shadow-lg">
-            <div className="mb-5">
-              <h2 className="text-xl font-semibold text-slate-900">{modalTitle}</h2>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <section className="modal-card max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-950 to-sky-700 text-white shadow-lg shadow-slate-900/15">
+                  <ClipboardIcon />
+                </span>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-950">{modalTitle}</h2>
+                  <p className="mt-1 text-sm font-medium text-slate-500">
+                    {modalMode === "edit"
+                      ? "Update task ownership, status, and timing."
+                      : "Create a task and route it to the right teammate."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={isSaving}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Close task modal"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
             </div>
 
-            {error && (
-              <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="project">
-                  Project
-                </label>
-                <select
-                  id="project"
-                  value={formValues.project}
-                  onChange={(event) => updateFormValue("project", event.target.value)}
-                  className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-                >
-                  <option value="">Select project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="title">
-                  Title
-                </label>
-                <input
-                  id="title"
-                  type="text"
-                  value={formValues.title}
-                  onChange={(event) => updateFormValue("title", event.target.value)}
-                  className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              <div>
-                <label
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                  htmlFor="description"
-                >
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  rows="3"
-                  value={formValues.description}
-                  onChange={(event) => updateFormValue("description", event.target.value)}
-                  className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
+            <form className="max-h-[calc(100vh-9rem)] space-y-5 overflow-y-auto p-6" onSubmit={handleSubmit}>
+              {error && (
+                <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <span className="mt-0.5">
+                    <ToastIcon type="error" />
+                  </span>
+                  <span className="font-medium">{error}</span>
+                </div>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                    htmlFor="assignee"
-                  >
-                    Assignee
+                  <label className="mb-2 block text-sm font-bold text-slate-700" htmlFor="project">
+                    Project
                   </label>
                   <select
-                    id="assignee"
-                    value={formValues.assignee}
-                    onChange={(event) => updateFormValue("assignee", event.target.value)}
-                    className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                    id="project"
+                    value={formValues.project}
+                    onChange={(event) => updateFormValue("project", event.target.value)}
+                    className="block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
                   >
-                    <option value="">Unassigned</option>
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {userLabel(user)}
+                    <option value="">Select project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="status">
+                  <label className="mb-2 block text-sm font-bold text-slate-700" htmlFor="status">
                     Status
                   </label>
                   <select
                     id="status"
                     value={formValues.status}
                     onChange={(event) => updateFormValue("status", event.target.value)}
-                    className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                    className="block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
                   >
                     {statuses.map((status) => (
                       <option key={status.value} value={status.value}>
@@ -771,33 +1322,106 @@ function Tasks() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="due_date">
-                  Due Date
+                <label className="mb-2 block text-sm font-bold text-slate-700" htmlFor="title">
+                  Title
                 </label>
-                <input
-                  id="due_date"
-                  type="datetime-local"
-                  value={formValues.due_date}
-                  onChange={(event) => updateFormValue("due_date", event.target.value)}
-                  className="block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <ClipboardIcon />
+                  </span>
+                  <input
+                    id="title"
+                    type="text"
+                    value={formValues.title}
+                    onChange={(event) => updateFormValue("title", event.target.value)}
+                    placeholder="Example: Prepare launch checklist"
+                    className="block h-11 w-full rounded-lg border border-slate-200 bg-white py-0 pl-10 pr-3 text-sm font-medium text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="mb-2 block text-sm font-bold text-slate-700"
+                  htmlFor="description"
+                >
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  rows="3"
+                  value={formValues.description}
+                  onChange={(event) => updateFormValue("description", event.target.value)}
+                  placeholder="Add context, handoff notes, or acceptance criteria."
+                  className="block min-h-28 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-medium leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="mb-2 block text-sm font-bold text-slate-700"
+                    htmlFor="assignee"
+                  >
+                    Assignee
+                  </label>
+                  <select
+                    id="assignee"
+                    value={formValues.assignee}
+                    onChange={(event) => updateFormValue("assignee", event.target.value)}
+                    className="block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {userLabel(user)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    className="mb-2 block text-sm font-bold text-slate-700"
+                    htmlFor="due_date"
+                  >
+                    Due Date
+                  </label>
+                  <input
+                    id="due_date"
+                    type="datetime-local"
+                    value={formValues.due_date}
+                    onChange={(event) => updateFormValue("due_date", event.target.value)}
+                    className="block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={isSaving}
-                  className="rounded border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-400 disabled:shadow-none"
                 >
-                  {isSaving ? "Saving..." : "Save Task"}
+                  {isSaving ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon />
+                      Save Task
+                    </>
+                  )}
                 </button>
               </div>
             </form>
