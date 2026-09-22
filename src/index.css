@@ -10,3 +10,137 @@ body {
 #root {
   min-height: 100vh;
 }
+
+.login-screen {
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    #edf2f7;
+  background-size: 44px 44px;
+}
+
+.login-shell,
+.login-visual,
+.login-panel,
+.login-preview {
+  border-radius: 8px;
+}
+
+.login-visual {
+  position: relative;
+  overflow: hidden;
+  animation: login-panel-in 560ms ease-out both;
+}
+
+.login-visual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(34, 211, 238, 0.18) 42%, transparent 56%),
+    linear-gradient(145deg, rgba(20, 184, 166, 0.18), transparent 44%),
+    linear-gradient(315deg, rgba(245, 158, 11, 0.14), transparent 38%);
+  animation: login-sheen 7s ease-in-out infinite alternate;
+}
+
+.login-visual::after {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.login-panel {
+  animation: login-card-in 520ms ease-out 100ms both;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.login-shell {
+  animation: login-card-in 520ms ease-out both;
+}
+
+.login-preview {
+  animation: login-float 5s ease-in-out infinite;
+}
+
+.login-task-row {
+  animation: login-row-in 520ms ease-out both;
+}
+
+.login-submit svg {
+  transition: transform 160ms ease;
+}
+
+.login-submit:hover svg {
+  transform: translateX(3px);
+}
+
+@keyframes login-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes login-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes login-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes login-sheen {
+  from {
+    transform: translateX(-6%);
+  }
+  to {
+    transform: translateX(6%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-visual,
+  .login-panel,
+  .login-preview,
+  .login-task-row,
+  .login-visual::before {
+    animation: none;
+  }
+
+  .login-submit,
+  .login-submit svg {
+    transition: none;
+  }
+}

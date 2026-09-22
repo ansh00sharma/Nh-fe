@@ -18,7 +18,7 @@ function AppLayout() {
   useEffect(() => {
     const accessToken = getAccessToken();
 
-    if (!accessToken || user?.modules?.length) {
+    if (!accessToken) {
       return;
     }
 
@@ -42,7 +42,7 @@ function AppLayout() {
     return () => {
       ignore = true;
     };
-  }, [user]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
