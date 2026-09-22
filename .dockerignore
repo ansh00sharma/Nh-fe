@@ -1,0 +1,14 @@
+node_modules
+node_modules.zip
+
+dist
+
+.git
+.github
+
+.env
+.env.*
+
+.vscode
+
+npm-debug.log*

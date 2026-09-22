@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(message, { status, payload } = {}) {
@@ -10,7 +12,8 @@ export class ApiError extends Error {
 }
 
 function buildUrl(path) {
-  return `${API_BASE_URL}${path}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${normalizedPath}`;
 }
 
 function getErrorMessage(payload, fallback) {
