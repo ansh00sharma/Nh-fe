@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   fetchCurrentUser,
   getAccessToken,
@@ -10,15 +10,22 @@ import {
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const defaultAuthenticatedPath = getDefaultAuthenticatedPath();
+  const returnLocation = location.state?.from;
+  const returnPath =
+    returnLocation?.pathname && returnLocation.pathname !== "/login"
+      ? `${returnLocation.pathname}${returnLocation.search || ""}${returnLocation.hash || ""}`
+      : "";
+  const authenticatedPath = returnPath || defaultAuthenticatedPath;
 
   if (getAccessToken() && defaultAuthenticatedPath !== "/login") {
-    return <Navigate to={defaultAuthenticatedPath} replace />;
+    return <Navigate to={authenticatedPath} replace />;
   }
 
   async function handleSubmit(event) {
@@ -42,7 +49,7 @@ function Login() {
       const user = await fetchCurrentUser(accessToken);
 
       saveAuthSession({ accessToken, refreshToken, user });
-      navigate(getDefaultAuthenticatedPath(user), { replace: true });
+      navigate(returnPath || getDefaultAuthenticatedPath(user), { replace: true });
     } catch (loginError) {
       setError(loginError.message || "Login failed. Please try again.");
     } finally {

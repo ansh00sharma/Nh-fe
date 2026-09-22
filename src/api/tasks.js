@@ -33,6 +33,15 @@ export async function getTasks(params = {}) {
   return unwrapData(payload);
 }
 
+export async function getTask(id) {
+  const payload = await apiRequest(`/api/tasks/${id}/direct/`, {
+    method: "GET",
+    token: getToken(),
+  });
+
+  return unwrapData(payload);
+}
+
 export async function createTask(data) {
   const payload = await apiRequest("/api/tasks/", {
     method: "POST",
