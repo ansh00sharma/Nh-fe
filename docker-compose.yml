@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "81:81"
+      - "81:80"
 
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
