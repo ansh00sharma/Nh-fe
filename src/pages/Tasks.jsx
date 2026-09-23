@@ -5,6 +5,7 @@ import { getProjects } from "../api/projects.js";
 import { createTask, deleteTask, getTask, getTasks, updateTask } from "../api/tasks.js";
 import { getUsers } from "../api/users.js";
 import DeleteConfirmationModal from "../components/DeleteConfirmationModal.jsx";
+import TaskDetailModal from "../components/TaskDetailModal.jsx";
 import {
   formatDateTimeIST,
   istDateTimeLocalToUTCISOString,
@@ -65,10 +66,6 @@ function userLabel(user) {
   return name ? `${name} (${user.email})` : user.email;
 }
 
-function statusLabel(value) {
-  return statuses.find((status) => status.value === value)?.label || value || "-";
-}
-
 function getTaskInitials(task) {
   return (
     task.title
@@ -110,63 +107,6 @@ function ClipboardIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M9 5.5h6M9.5 4h5A1.5 1.5 0 0 1 16 5.5V7H8V5.5A1.5 1.5 0 0 1 9.5 4ZM6.5 6.5h11A1.5 1.5 0 0 1 19 8v10.5A1.5 1.5 0 0 1 17.5 20h-11A1.5 1.5 0 0 1 5 18.5V8a1.5 1.5 0 0 1 1.5-1.5ZM8.5 12h7M8.5 16h5"
-      />
-    </svg>
-  );
-}
-
-function FolderIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v6A2.5 2.5 0 0 1 17.5 18h-11A2.5 2.5 0 0 1 4 15.5v-8Z"
-      />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.5 19v-1.3a3.2 3.2 0 0 0-3.2-3.2H7.7a3.2 3.2 0 0 0-3.2 3.2V19M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM18.5 19v-1a3 3 0 0 0-2-2.8M16.5 5a3.4 3.4 0 0 1 0 6"
-      />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7 4v3M17 4v3M5 9h14M6.5 6h11A1.5 1.5 0 0 1 19 7.5v10A1.5 1.5 0 0 1 17.5 19h-11A1.5 1.5 0 0 1 5 17.5v-10A1.5 1.5 0 0 1 6.5 6Z"
       />
     </svg>
   );
@@ -310,154 +250,6 @@ function TasksToast({ toast, onClose }) {
           </svg>
         </button>
       </div>
-    </div>
-  );
-}
-
-function DetailItem({ icon, label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
-      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
-        <span className="text-slate-400">{icon}</span>
-        {label}
-      </div>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">{value || "-"}</p>
-    </div>
-  );
-}
-
-function TaskDetailModal({ task, taskId, isLoading, state, onClose }) {
-  const isDeleted = state === "deleted";
-  const hasError = state === "error";
-  const isWaitingForTask = isLoading || (!task && !isDeleted && !hasError);
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-      <section className="modal-card w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-6 py-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-950 to-sky-700 text-white shadow-lg shadow-slate-900/15">
-              <ClipboardIcon />
-            </span>
-            <div>
-              <h2 className="text-xl font-bold text-slate-950">
-                {task?.title || `Task #${taskId}`}
-              </h2>
-              <p className="mt-1 text-sm font-medium text-slate-500">
-                Direct task link details
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
-            aria-label="Close task details"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
-
-        {isWaitingForTask ? (
-          <div className="grid gap-3 p-6">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="h-16 animate-pulse rounded-lg bg-slate-100" />
-            ))}
-          </div>
-        ) : isDeleted ? (
-          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
-              <TrashIcon />
-            </div>
-            <h3 className="mt-4 text-base font-bold text-slate-950">This task was deleted</h3>
-            <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
-              The task link is valid, but the backend did not return an active task record.
-            </p>
-          </div>
-        ) : hasError ? (
-          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <ToastIcon type="error" />
-            </div>
-            <h3 className="mt-4 text-base font-bold text-slate-950">Could not load this task</h3>
-            <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
-              Please refresh or check whether you still have access to this task.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-5 p-6">
-            <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-950 via-slate-800 to-sky-700 text-sm font-bold text-white shadow-md shadow-slate-900/10">
-                  {getTaskInitials(task)}
-                </span>
-                <div>
-                  <h3 className="mt-1 text-lg font-bold text-slate-950">{task.title}</h3>
-                </div>
-              </div>
-              <span
-                className={`inline-flex self-start rounded-full border px-3 py-1 text-xs font-bold sm:self-center ${
-                  statusStyles[task.status] || "border-slate-200 bg-slate-50 text-slate-700"
-                }`}
-              >
-                {statusLabel(task.status)}
-              </span>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <DetailItem
-                icon={<FolderIcon />}
-                label="Project"
-                value={task.project_name || `Project #${task.project}`}
-              />
-              <DetailItem
-                icon={<UserIcon />}
-                label="Assignee"
-                value={task.assignee_name || task.assignee_email || "Unassigned"}
-              />
-              <DetailItem
-                icon={<UserIcon />}
-                label="Assigned By"
-                value={task.assigned_by_name || task.assigned_by_email || "-"}
-              />
-              <DetailItem
-                icon={<CalendarIcon />}
-                label="Due"
-                value={formatDateTimeIST(task.due_date)}
-              />
-              <DetailItem
-                icon={<CalendarIcon />}
-                label="Created"
-                value={formatDateTimeIST(task.created_at)}
-              />
-              <DetailItem
-                icon={<CalendarIcon />}
-                label="Updated"
-                value={formatDateTimeIST(task.updated_at)}
-              />
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
-                <ClipboardIcon />
-                Description
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-700">
-                {task.description || "No description was added for this task."}
-              </p>
-            </div>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
