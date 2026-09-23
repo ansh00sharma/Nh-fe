@@ -2,6 +2,13 @@
 
 TaskFlow Frontend is a Vite + React single-page application for the TaskFlow task management product. It connects to the Django REST backend, handles JWT-based login, protects routes, and renders role-based modules for dashboard, users, projects, and tasks.
 
+## Live Links
+
+- Live application: http://15.252.221.30/
+- Swagger API docs: http://15.252.221.30/api/docs/
+- Grafana: http://15.252.221.30:3000/
+- Prometheus: http://15.252.221.30:9090/
+
 ## Core Functionality
 
 - Login screen with JWT authentication.
