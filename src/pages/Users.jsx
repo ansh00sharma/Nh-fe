@@ -33,6 +33,10 @@ function userListFromResponse(data) {
   return data?.results ?? [];
 }
 
+function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
 function getUserName(user) {
   return [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email;
 }
@@ -230,26 +234,43 @@ function Users() {
     return false;
   }
 
-  async function loadUsers() {
+  async function loadUsers({ signal } = {}) {
     setIsLoading(true);
     setError("");
 
     try {
-      const data = await getUsers();
+      const data = await getUsers({ signal });
+
+      if (signal?.aborted) {
+        return;
+      }
+
       setUsers(userListFromResponse(data));
     } catch (apiError) {
+      if (isAbortError(apiError)) {
+        return;
+      }
+
       if (!handleAuthError(apiError)) {
         const message = apiError.message || "Could not load users.";
         setError(message);
         setToast({ type: "error", message });
       }
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }
 
   useEffect(() => {
-    loadUsers();
+    const controller = new AbortController();
+
+    loadUsers({ signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {

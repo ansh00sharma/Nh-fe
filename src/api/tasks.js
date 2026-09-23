@@ -15,7 +15,7 @@ function getToken() {
   return token;
 }
 
-export async function getTasks(params = {}) {
+export async function getTasks(params = {}, { signal } = {}) {
   const query = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -28,15 +28,17 @@ export async function getTasks(params = {}) {
   const payload = await apiRequest(path, {
     method: "GET",
     token: getToken(),
+    signal,
   });
 
   return unwrapData(payload);
 }
 
-export async function getTask(id) {
+export async function getTask(id, { signal } = {}) {
   const payload = await apiRequest(`/api/tasks/${id}/direct/`, {
     method: "GET",
     token: getToken(),
+    signal,
   });
 
   return unwrapData(payload);

@@ -15,10 +15,11 @@ function getToken() {
   return token;
 }
 
-export async function getUsers() {
+export async function getUsers({ signal } = {}) {
   const payload = await apiRequest("/api/users/", {
     method: "GET",
     token: getToken(),
+    signal,
   });
 
   return unwrapData(payload);

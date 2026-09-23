@@ -1,31 +1,25 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import {
-  fetchCurrentUser,
-  getAccessToken,
-  getDefaultAuthenticatedPath,
-  login,
-  saveAuthSession,
-} from "../api/auth.js";
+import { Navigate, useNavigate } from "react-router-dom";
+import { fetchCurrentUser, login } from "../api/auth.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { completeLogin, isAuthenticated, isAuthLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-semibold text-slate-500">
+        Loading...
+      </div>
+    );
+  }
 
-  const defaultAuthenticatedPath = getDefaultAuthenticatedPath();
-  const returnLocation = location.state?.from;
-  const returnPath =
-    returnLocation?.pathname && returnLocation.pathname !== "/login"
-      ? `${returnLocation.pathname}${returnLocation.search || ""}${returnLocation.hash || ""}`
-      : "";
-  const authenticatedPath = returnPath || defaultAuthenticatedPath;
-
-  if (getAccessToken() && defaultAuthenticatedPath !== "/login") {
-    return <Navigate to={authenticatedPath} replace />;
+  if (isAuthenticated) {
+    return <Navigate to="/tasks" replace />;
   }
 
   async function handleSubmit(event) {
@@ -48,8 +42,8 @@ function Login() {
       });
       const user = await fetchCurrentUser(accessToken);
 
-      saveAuthSession({ accessToken, refreshToken, user });
-      navigate(returnPath || getDefaultAuthenticatedPath(user), { replace: true });
+      completeLogin({ accessToken, refreshToken, user });
+      navigate("/tasks", { replace: true });
     } catch (loginError) {
       setError(loginError.message || "Login failed. Please try again.");
     } finally {

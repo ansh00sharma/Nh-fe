@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseAsInteger, useQueryState } from "nuqs";
 import { useNavigate } from "react-router-dom";
 import { getStoredUser, logout } from "../api/auth.js";
@@ -55,6 +55,10 @@ function paginationFromResponse(data) {
     next: data?.next ?? null,
     previous: data?.previous ?? null,
   };
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
 }
 
 function userLabel(user) {
@@ -564,6 +568,9 @@ function Tasks() {
   const [taskDetail, setTaskDetail] = useState(null);
   const [taskDetailState, setTaskDetailState] = useState("idle");
   const [isTaskDetailLoading, setIsTaskDetailLoading] = useState(false);
+  const referenceDataLoadedRef = useRef(false);
+  const referenceDataRequestRef = useRef(null);
+  const referenceDataControllerRef = useRef(null);
 
   const isModalOpen = Boolean(modalMode);
   const isTaskDetailOpen = selectedTaskId !== null;
@@ -621,33 +628,111 @@ function Tasks() {
     return params;
   }
 
-  async function loadTasks() {
+  async function loadTaskList({ signal } = {}) {
     setIsLoading(true);
     setError("");
 
     try {
-      const taskData = await getTasks(getTaskFilters());
+      const taskData = await getTasks(getTaskFilters(), { signal });
+
+      if (signal?.aborted) {
+        return;
+      }
+
       setTasks(listFromResponse(taskData));
       setPagination(paginationFromResponse(taskData));
-
-      if (canManageTasks) {
-        const [projectData, userData] = await Promise.all([getProjects(), getUsers()]);
-        setProjects(listFromResponse(projectData));
-        setUsers(listFromResponse(userData));
-      }
     } catch (apiError) {
+      if (isAbortError(apiError)) {
+        return;
+      }
+
       if (!handleAuthError(apiError)) {
         const message = apiError.message || "Could not load tasks.";
         setError(message);
         setToast({ type: "error", message });
       }
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }
 
+  async function loadTaskReferenceData({ signal } = {}) {
+    try {
+      const [projectData, userData] = await Promise.all([
+        getProjects({ signal }),
+        getUsers({ signal }),
+      ]);
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      const nextProjects = listFromResponse(projectData);
+      const nextUsers = listFromResponse(userData);
+
+      setProjects(nextProjects);
+      setUsers(nextUsers);
+
+      return {
+        projects: nextProjects,
+        users: nextUsers,
+      };
+    } catch (apiError) {
+      if (isAbortError(apiError)) {
+        return null;
+      }
+
+      if (!handleAuthError(apiError)) {
+        const message = apiError.message || "Could not load task reference data.";
+        setError(message);
+        setToast({ type: "error", message });
+      }
+
+      throw apiError;
+    }
+
+    return null;
+  }
+
+  async function ensureTaskReferenceData() {
+    if (!canManageTasks || referenceDataLoadedRef.current) {
+      return {
+        projects,
+        users,
+      };
+    }
+
+    if (!referenceDataRequestRef.current) {
+      referenceDataControllerRef.current = new AbortController();
+      referenceDataRequestRef.current = loadTaskReferenceData({
+        signal: referenceDataControllerRef.current.signal,
+      })
+        .then((data) => {
+          if (data) {
+            referenceDataLoadedRef.current = true;
+          }
+
+          return data;
+        })
+        .finally(() => {
+          referenceDataRequestRef.current = null;
+          referenceDataControllerRef.current = null;
+        });
+    }
+
+    return referenceDataRequestRef.current;
+  }
+
   useEffect(() => {
-    loadTasks();
+    const controller = new AbortController();
+
+    loadTaskList({ signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
   }, [
     activeTab,
     filters.status,
@@ -663,6 +748,12 @@ function Tasks() {
       setActiveTab("assigned");
     }
   }, [canManageTasks]);
+
+  useEffect(() => {
+    return () => {
+      referenceDataControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (!toast) {
@@ -689,7 +780,9 @@ function Tasks() {
     setTaskDetailState("idle");
     setIsTaskDetailLoading(true);
 
-    getTask(selectedTaskId)
+    const controller = new AbortController();
+
+    getTask(selectedTaskId, { signal: controller.signal })
       .then((data) => {
         if (ignore) {
           return;
@@ -704,6 +797,10 @@ function Tasks() {
         setTaskDetailState("ready");
       })
       .catch((apiError) => {
+        if (isAbortError(apiError)) {
+          return;
+        }
+
         if (ignore || handleAuthError(apiError)) {
           return;
         }
@@ -718,6 +815,7 @@ function Tasks() {
 
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [selectedTaskId]);
 
@@ -752,20 +850,41 @@ function Tasks() {
     setPage(1);
   }
 
-  function openCreateModal() {
+  async function openCreateModal() {
     setSelectedTaskId(null);
+    setError("");
+    setToast(null);
+
+    let referenceData = {
+      projects,
+      users,
+    };
+
+    try {
+      referenceData = (await ensureTaskReferenceData()) || referenceData;
+    } catch {
+      return;
+    }
+
     setModalMode("create");
     setSelectedTask(null);
     setFormValues({
       ...emptyForm,
-      project: projects[0]?.id ? String(projects[0].id) : "",
+      project: referenceData.projects[0]?.id ? String(referenceData.projects[0].id) : "",
     });
-    setError("");
-    setToast(null);
   }
 
-  function openEditModal(task) {
+  async function openEditModal(task) {
     setSelectedTaskId(null);
+    setError("");
+    setToast(null);
+
+    try {
+      await ensureTaskReferenceData();
+    } catch {
+      return;
+    }
+
     setModalMode("edit");
     setSelectedTask(task);
     setFormValues({
@@ -776,8 +895,6 @@ function Tasks() {
       assignee: task.assignee ? String(task.assignee) : "",
       due_date: toISTDateTimeLocal(task.due_date),
     });
-    setError("");
-    setToast(null);
   }
 
   function closeModal({ force = false } = {}) {
@@ -848,7 +965,7 @@ function Tasks() {
       }
 
       closeModal({ force: true });
-      await loadTasks();
+      await loadTaskList();
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
         const message = apiError.message || "Could not save task.";
@@ -865,7 +982,7 @@ function Tasks() {
 
     try {
       await updateTask(task.id, { status });
-      await loadTasks();
+      await loadTaskList();
       setToast({ type: "success", message: "Task status updated successfully." });
     } catch (apiError) {
       if (!handleAuthError(apiError)) {
@@ -897,7 +1014,7 @@ function Tasks() {
       if (tasks.length === 1 && page > 1) {
         setPage((current) => Math.max(1, current - 1));
       } else {
-        await loadTasks();
+        await loadTaskList();
       }
     } catch (apiError) {
       if (!handleAuthError(apiError)) {

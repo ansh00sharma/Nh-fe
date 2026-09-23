@@ -3,14 +3,17 @@ import { createRoot } from "react-dom/client";
 import { NuqsAdapter } from "nuqs/adapters/react-router/v7";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
+import { AuthProvider } from "./context/AuthContext.jsx";
 import "./index.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
-      <NuqsAdapter>
-        <App />
-      </NuqsAdapter>
+      <AuthProvider>
+        <NuqsAdapter>
+          <App />
+        </NuqsAdapter>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 );
