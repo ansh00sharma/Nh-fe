@@ -897,10 +897,10 @@ function Tasks() {
         <div className="border-b border-slate-100 bg-white px-5 py-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h2 className="text-sm font-bold text-slate-950">Task Board</h2>
+              {/* <h2 className="text-sm font-bold text-slate-950">Task Board</h2>
               <p className="mt-1 text-xs font-medium text-slate-500">
                 Showing {firstVisibleTask}-{lastVisibleTask} of {pagination.count} tasks
-              </p>
+              </p> */}
             </div>
 
             <div className="overflow-x-auto">
@@ -1071,7 +1071,7 @@ function Tasks() {
                   {showAssignedByColumn && <th className="px-5 py-4">Assigned By</th>}
                   <th className="px-5 py-4">Due</th>
                   <th className="px-5 py-4">Status</th>
-                  {canManageTasks && <th className="px-5 py-4 text-right">Actions</th>}
+                  <th className="px-5 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1125,36 +1125,38 @@ function Tasks() {
                         ))}
                       </select>
                     </td>
-                    {canManageTasks && (
-                      <td className="whitespace-nowrap px-5 py-4 text-right">
-                        <div className="inline-flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openTaskDetail(task)}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                          >
-                            <EyeIcon />
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(task)}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                          >
-                            <PencilIcon />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openDeleteModal(task)}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-bold text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
-                          >
-                            <TrashIcon />
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                    <td className="whitespace-nowrap px-5 py-4 text-right">
+                      <div className="inline-flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openTaskDetail(task)}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                        >
+                          <EyeIcon />
+                          View
+                        </button>
+                        {canManageTasks && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(task)}
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                            >
+                              <PencilIcon />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openDeleteModal(task)}
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-bold text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            >
+                              <TrashIcon />
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
