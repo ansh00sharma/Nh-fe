@@ -29,6 +29,10 @@ function projectListFromResponse(data) {
   return data?.results ?? [];
 }
 
+function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
 function projectInitials(project) {
   return (
     project.name
@@ -247,26 +251,43 @@ function Projects() {
     return false;
   }
 
-  async function loadProjects() {
+  async function loadProjects({ signal } = {}) {
     setIsLoading(true);
     setError("");
 
     try {
-      const data = await getProjects();
+      const data = await getProjects({ signal });
+
+      if (signal?.aborted) {
+        return;
+      }
+
       setProjects(projectListFromResponse(data));
     } catch (apiError) {
+      if (isAbortError(apiError)) {
+        return;
+      }
+
       if (!handleAuthError(apiError)) {
         const message = apiError.message || "Could not load projects.";
         setError(message);
         setToast({ type: "error", message });
       }
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }
 
   useEffect(() => {
-    loadProjects();
+    const controller = new AbortController();
+
+    loadProjects({ signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {

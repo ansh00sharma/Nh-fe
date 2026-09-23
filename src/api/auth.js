@@ -1,8 +1,9 @@
-import { apiRequest } from "./client.js";
+import { apiRequest, clearInflightGetRequests } from "./client.js";
 
 export const ACCESS_TOKEN_KEY = "taskflow_access_token";
 export const REFRESH_TOKEN_KEY = "taskflow_refresh_token";
 export const USER_KEY = "taskflow_user";
+export const AUTH_SESSION_CLEARED_EVENT = "taskflow_auth_session_cleared";
 
 function getStorage() {
   return typeof window === "undefined" ? null : window.localStorage;
@@ -73,6 +74,12 @@ export function saveAuthSession({ accessToken, refreshToken, user }) {
 
   if (!storage) {
     return;
+  }
+
+  const previousAccessToken = storage.getItem(ACCESS_TOKEN_KEY);
+
+  if (accessToken && accessToken !== previousAccessToken) {
+    clearInflightGetRequests();
   }
 
   if (accessToken) {
@@ -167,6 +174,9 @@ export function clearAuthSession() {
   storage.removeItem(ACCESS_TOKEN_KEY);
   storage.removeItem(REFRESH_TOKEN_KEY);
   storage.removeItem(USER_KEY);
+  clearInflightGetRequests();
+
+  window.dispatchEvent(new Event(AUTH_SESSION_CLEARED_EVENT));
 }
 
 export function logout(navigate) {

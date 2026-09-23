@@ -15,10 +15,11 @@ function getToken() {
   return token;
 }
 
-export async function getProjects() {
+export async function getProjects({ signal } = {}) {
   const payload = await apiRequest("/api/projects/", {
     method: "GET",
     token: getToken(),
+    signal,
   });
 
   return unwrapData(payload);

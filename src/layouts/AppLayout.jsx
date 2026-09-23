@@ -1,50 +1,15 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import {
-  fetchCurrentUser,
-  getAccessToken,
-  getRefreshToken,
-  getStoredUser,
-  getUserInitials,
-  saveAuthSession,
-} from "../api/auth.js";
+import { getUserInitials } from "../api/auth.js";
 import Navbar from "../components/Navbar.jsx";
 import Sidebar from "../components/Sidebar.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [user, setUser] = useState(() => getStoredUser());
+  const { currentUser } = useAuth();
   const location = useLocation();
-
-  useEffect(() => {
-    const accessToken = getAccessToken();
-
-    if (!accessToken) {
-      return;
-    }
-
-    let ignore = false;
-
-    fetchCurrentUser(accessToken)
-      .then((currentUser) => {
-        if (ignore) {
-          return;
-        }
-
-        setUser(currentUser);
-        saveAuthSession({ accessToken, refreshToken: getRefreshToken(), user: currentUser });
-      })
-      .catch(() => {
-        if (!ignore) {
-          setUser(null);
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -53,8 +18,8 @@ function AppLayout() {
   return (
     <div className="app-shell min-h-screen text-slate-950">
       <Navbar
-        initials={getUserInitials(user)}
-        user={user}
+        initials={getUserInitials(currentUser)}
+        user={currentUser}
         onMenuToggle={() => setMobileSidebarOpen((current) => !current)}
       />
       <div className="flex h-[calc(100vh-4.25rem)] min-h-0">
@@ -63,7 +28,7 @@ function AppLayout() {
           mobileOpen={mobileSidebarOpen}
           onToggle={() => setSidebarCollapsed((current) => !current)}
           onClose={() => setMobileSidebarOpen(false)}
-          modules={user?.modules}
+          modules={currentUser?.modules}
         />
         <main className="relative min-w-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />

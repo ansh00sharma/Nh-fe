@@ -11,7 +11,7 @@ import ProtectedRoute from "./ProtectedRoute.jsx";
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<Navigate to="/tasks" replace />} />
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>

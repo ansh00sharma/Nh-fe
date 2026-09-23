@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { logout, logoutFromServer } from "../api/auth.js";
+import { logoutFromServer } from "../api/auth.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const pageMeta = {
   "/dashboard": {
@@ -24,6 +25,7 @@ const pageMeta = {
 function Navbar({ initials, user, onMenuToggle }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const menuRef = useRef(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
