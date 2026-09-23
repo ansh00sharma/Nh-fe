@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { parseAsInteger, useQueryState } from "nuqs";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getStoredUser, logout } from "../api/auth.js";
 import { getProjects } from "../api/projects.js";
 import { createTask, deleteTask, getTask, getTasks, updateTask } from "../api/tasks.js";
@@ -330,6 +329,7 @@ function DetailItem({ icon, label, value }) {
 function TaskDetailModal({ task, taskId, isLoading, state, onClose }) {
   const isDeleted = state === "deleted";
   const hasError = state === "error";
+  const isWaitingForTask = isLoading || (!task && !isDeleted && !hasError);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
@@ -367,7 +367,7 @@ function TaskDetailModal({ task, taskId, isLoading, state, onClose }) {
           </button>
         </div>
 
-        {isLoading ? (
+        {isWaitingForTask ? (
           <div className="grid gap-3 p-6">
             {[1, 2, 3].map((item) => (
               <div key={item} className="h-16 animate-pulse rounded-lg bg-slate-100" />
@@ -535,9 +535,17 @@ function TaskTitle({ task, onOpen }) {
 
 function Tasks() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = getStoredUser();
   const canManageTasks = currentUser?.role === "admin" || currentUser?.role === "manager";
-  const [selectedTaskId, setSelectedTaskId] = useQueryState("task", parseAsInteger);
+  const selectedTaskId = useMemo(() => {
+    const rawTaskId =
+      searchParams.get("task") ||
+      new URLSearchParams(window.location.search).get("task");
+    const parsedTaskId = Number(rawTaskId);
+
+    return Number.isInteger(parsedTaskId) && parsedTaskId > 0 ? parsedTaskId : null;
+  }, [searchParams]);
 
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -558,12 +566,15 @@ function Tasks() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReferenceDataLoading, setIsReferenceDataLoading] = useState(false);
   const [error, setError] = useState("");
   const [modalMode, setModalMode] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [formValues, setFormValues] = useState(emptyForm);
-  const [activeTab, setActiveTab] = useState("assigned");
+  const [activeTab, setActiveTab] = useState(() =>
+    canManageTasks && selectedTaskId !== null ? "created" : "assigned",
+  );
   const [toast, setToast] = useState(null);
   const [taskDetail, setTaskDetail] = useState(null);
   const [taskDetailState, setTaskDetailState] = useState("idle");
@@ -659,6 +670,8 @@ function Tasks() {
   }
 
   async function loadTaskReferenceData({ signal } = {}) {
+    setIsReferenceDataLoading(true);
+
     try {
       const [projectData, userData] = await Promise.all([
         getProjects({ signal }),
@@ -691,6 +704,10 @@ function Tasks() {
       }
 
       throw apiError;
+    } finally {
+      if (!signal?.aborted) {
+        setIsReferenceDataLoading(false);
+      }
     }
 
     return null;
@@ -748,6 +765,16 @@ function Tasks() {
       setActiveTab("assigned");
     }
   }, [canManageTasks]);
+
+  useEffect(() => {
+    if (selectedTaskId === null || !canManageTasks) {
+      return;
+    }
+
+    setActiveTab("created");
+    setFilters((current) => ({ ...current, assignee: "" }));
+    setPage(1);
+  }, [canManageTasks, selectedTaskId]);
 
   useEffect(() => {
     return () => {
@@ -850,32 +877,47 @@ function Tasks() {
     setPage(1);
   }
 
-  async function openCreateModal() {
-    setSelectedTaskId(null);
+  function clearTaskSearchParam() {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("task");
+      return next;
+    });
+  }
+
+  function openCreateModal() {
+    clearTaskSearchParam();
     setError("");
     setToast(null);
-
-    let referenceData = {
-      projects,
-      users,
-    };
-
-    try {
-      referenceData = (await ensureTaskReferenceData()) || referenceData;
-    } catch {
-      return;
-    }
-
     setModalMode("create");
     setSelectedTask(null);
     setFormValues({
       ...emptyForm,
-      project: referenceData.projects[0]?.id ? String(referenceData.projects[0].id) : "",
+      project: projects[0]?.id ? String(projects[0].id) : "",
     });
+
+    ensureTaskReferenceData()
+      .then((referenceData) => {
+        if (!referenceData?.projects?.length) {
+          return;
+        }
+
+        setFormValues((current) => {
+          if (current.project) {
+            return current;
+          }
+
+          return {
+            ...current,
+            project: String(referenceData.projects[0].id),
+          };
+        });
+      })
+      .catch(() => {});
   }
 
   async function openEditModal(task) {
-    setSelectedTaskId(null);
+    clearTaskSearchParam();
     setError("");
     setToast(null);
 
@@ -908,11 +950,15 @@ function Tasks() {
   }
 
   function openTaskDetail(task) {
-    setSelectedTaskId(task.id);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("task", String(task.id));
+      return next;
+    });
   }
 
   function closeTaskDetail() {
-    setSelectedTaskId(null);
+    clearTaskSearchParam();
   }
 
   function updateFormValue(field, value) {
@@ -1352,6 +1398,16 @@ function Tasks() {
         </div>
       </div>
 
+      {isTaskDetailOpen && (
+        <TaskDetailModal
+          task={taskDetail}
+          taskId={selectedTaskId}
+          isLoading={isTaskDetailLoading}
+          state={taskDetailState}
+          onClose={closeTaskDetail}
+        />
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
           <section className="modal-card max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/25">
@@ -1411,6 +1467,11 @@ function Tasks() {
                     className="block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
                   >
                     <option value="">Select project</option>
+                    {isReferenceDataLoading && projects.length === 0 && (
+                      <option value="" disabled>
+                        Loading projects...
+                      </option>
+                    )}
                     {projects.map((project) => (
                       <option key={project.id} value={project.id}>
                         {project.name}
@@ -1489,6 +1550,11 @@ function Tasks() {
                     className="block h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
                   >
                     <option value="">Unassigned</option>
+                    {isReferenceDataLoading && users.length === 0 && (
+                      <option value="" disabled>
+                        Loading assignees...
+                      </option>
+                    )}
                     {users.map((user) => (
                       <option key={user.id} value={user.id}>
                         {userLabel(user)}
